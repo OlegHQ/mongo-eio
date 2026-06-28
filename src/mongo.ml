@@ -31,11 +31,27 @@ let wrap_unix f arg =
   try (f arg) with
     | Unix.Unix_error (e, _, _) -> raise (Mongo_failed (Unix.error_message e));;
 
-let connect_to (ip,port) =
-    let c_descr = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-    let s_addr = Unix.ADDR_INET ((Unix.inet_addr_of_string ip), port) in
-    Unix.connect c_descr s_addr;
-    c_descr;;
+let close_noerr file_descr =
+  try Unix.close file_descr with Unix.Unix_error _ -> ();;
+
+let connect_to (host,port) =
+    let service = string_of_int port in
+    let addresses = Unix.getaddrinfo host service [Unix.AI_SOCKTYPE Unix.SOCK_STREAM] in
+    let rec connect_first = function
+      | [] -> raise (Unix.Unix_error (Unix.EHOSTUNREACH, "connect", host))
+      | address :: rest ->
+          let c_descr =
+            Unix.socket address.Unix.ai_family address.Unix.ai_socktype
+              address.Unix.ai_protocol
+          in
+          try
+            Unix.connect c_descr address.Unix.ai_addr;
+            c_descr
+          with Unix.Unix_error _ as error ->
+            close_noerr c_descr;
+            if rest = [] then raise error else connect_first rest
+    in
+    connect_first addresses;;
 
 let create ip port db_name collection_name =
   {

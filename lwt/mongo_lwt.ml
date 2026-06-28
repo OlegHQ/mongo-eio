@@ -32,9 +32,20 @@ let wrap_unix_lwt f arg =
   try_lwt (f arg) with
     | Unix.Unix_error (e, _, _) -> raise (Mongo_failed (Unix.error_message e));;
 
-let connect_to (ip,port) =
-  let s_addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string ip,port) in
-  Lwt_io.open_connection s_addr
+let connect_to (host,port) =
+  let service = string_of_int port in
+  let addresses = Unix.getaddrinfo host service [Unix.AI_SOCKTYPE Unix.SOCK_STREAM] in
+  let rec connect_first = function
+    | [] -> Lwt.fail (Unix.Unix_error (Unix.EHOSTUNREACH, "connect", host))
+    | address :: rest ->
+        Lwt.catch
+          (fun () -> Lwt_io.open_connection address.Unix.ai_addr)
+          (function
+            | Unix.Unix_error _ as error ->
+                if rest = [] then Lwt.fail error else connect_first rest
+            | error -> Lwt.fail error)
+  in
+  connect_first addresses
 
 let create ?(max_connection=10) ip port db_name collection_name =
   let channel_pool = Lwt_pool.create max_connection (
