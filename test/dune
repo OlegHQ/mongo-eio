@@ -1,0 +1,56 @@
+(test
+ (name test_mongo_unit)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_error)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_wire)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_command)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_uri)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_uri_spec)
+ (libraries mongo alcotest yojson)
+ (deps (source_tree fixtures/imported/uri-options/tests)))
+
+(test
+ (name test_mongo_scram)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_connection)
+ (libraries mongo alcotest unix threads.posix))
+
+(test
+ (name test_mongo_pool)
+ (libraries mongo alcotest unix))
+
+(test
+ (name test_mongo_server_select)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_session)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_dns)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_retry)
+ (libraries mongo alcotest))
+
+(test
+ (name test_mongo_cursor)
+ (libraries mongo alcotest unix threads.posix))

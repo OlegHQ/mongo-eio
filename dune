@@ -1,0 +1,4 @@
+(alias
+ (name e2e)
+ (deps
+  (alias_rec e2e)))

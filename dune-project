@@ -10,5 +10,16 @@
   (ocaml (>= 5.0))
   (dune (>= 3.16))
   bson
-  eio))
-
+  eio
+  eio_main
+  dns-client
+  digestif
+  mirage-crypto
+  mirage-crypto-rng
+  ca-certs
+  tls
+  x509
+  ipaddr
+  ptime
+  (yojson :with-test)
+  (alcotest :with-test)))

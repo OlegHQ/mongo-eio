@@ -1,3 +1,35 @@
 (executable
  (name mongo_driver_e2e)
  (libraries mongo unix))
+
+(executable
+ (name mongo_auth_e2e)
+ (libraries mongo unix))
+
+(executable
+ (name mongo_admin_e2e)
+ (libraries mongo unix))
+
+(executable
+ (name mongo_pool_e2e)
+ (libraries mongo unix threads.posix))
+
+(executable
+ (name mongo_tls_e2e)
+ (libraries mongo unix))
+
+(executable
+ (name mongo_replicaset_e2e)
+ (libraries mongo unix))
+
+(executable
+ (name mongo_failover_e2e)
+ (libraries mongo unix))
+
+(executable
+ (name mongo_retry_e2e)
+ (libraries mongo unix))
+
+(executable
+ (name mongo_eio_direct_e2e)
+ (libraries mongo unix eio_main))

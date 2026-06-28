@@ -14,6 +14,39 @@
   MongoRequest
   MongoSend
   MongoUtils
-  Mongo_eio)
- (libraries unix bson eio))
-
+  Mongo_eio
+  Mongo_error
+  Mongo_wire
+  Mongo_transport
+  Mongo_config
+  Mongo_command
+  Mongo_connection
+  Mongo_auth
+  Mongo_scram
+  Mongo_uri
+  Mongo_dns
+  Mongo_server_description
+  Mongo_topology
+  Mongo_server_select
+  Mongo_pool
+  Mongo_session
+  Mongo_retry
+  Mongo_cursor
+  Mongo_crud
+  Mongo_index)
+ (libraries
+  unix
+  bson
+  eio
+  dns-client.unix
+  digestif
+  digestif.ocaml
+  mirage-crypto
+  mirage-crypto-rng.unix
+  mirage-crypto-pk
+  ca-certs
+  tls
+  tls.unix
+  x509
+  ipaddr
+  ptime.clock))

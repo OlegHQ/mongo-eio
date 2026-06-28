@@ -19,3 +19,5 @@ _build/
 setup.log
 setup.data
 *.docdir
+.reference/
+test/fixtures/mongodb-specifications/

@@ -35,6 +35,7 @@ val destroy: t -> unit;;
 (** {6 Commands via a MongoAdmin, may raise MongoAdmin_failed exception.} *)
 
 val listDatabases: t -> MongoReply.t;;
+val hello: t -> MongoReply.t;;
 val buildInfo: t -> MongoReply.t;;
 val collStats: t -> MongoReply.t;;
 val connPoolStats: t -> MongoReply.t;;

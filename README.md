@@ -2,6 +2,56 @@
 
 **Mongo.ml** is an OCaml driver for MongoDB.
 
+## OlegHQ `mongo-eio` fork scope
+
+This fork is packaged with Dune for OCaml 5 and currently supports the
+synchronous compatibility modules plus additive Eio wrappers used by Poster.
+The supported command path uses MongoDB `OP_MSG` for normal CRUD, index, admin,
+cursor, authentication, and pool smoke coverage.
+
+The historical `lwt/` sources are kept in the repository for reference only.
+They are not included in the Dune package, are not covered by the current
+`OP_MSG`/auth/topology tests, and should not be treated as production-supported
+unless they are explicitly modernized.
+
+## Production notes for this fork
+
+Use the modern `Mongo_config`, `Mongo_connection`, `Mongo_pool`,
+`Mongo_topology`, and `Mongo_eio.direct_client` path for new code. The legacy
+collection-bound `Mongo.t` API remains for compatibility, but new behavior is
+verified on the OP_MSG command/pool/direct-client path.
+
+Monitor callbacks should update both topology and pool state. A typical
+callback folds the `Mongo_server_description.t` through
+`Mongo_topology.update_server` and then passes the same description to
+`Mongo_pool.update_server_description`; the pool hook clears stale pooled
+connections when a monitor reports an `Unknown` server with error details.
+
+Replica-set discovery, seed fallback, server selection, failover reconnect,
+timeouts, SCRAM authentication, TLS server authentication, retryable command
+execution, cursor `getMore`/`killCursors`, and pool lifecycle behavior have
+unit/e2e coverage in this fork. Remaining production gaps are full background
+SDAM ownership of per-discovered-server pools, long-lived multi-node routing
+after topology changes, fuller CMAP event parity, speculative/reauthentication
+auth flows, and advanced TLS options such as client certificates and revocation
+checking.
+
+## Verification
+
+Run the local driver matrix before relying on this fork:
+
+```sh
+opam exec -- dune runtest --root vendor/mongo-eio
+vendor/mongo-eio/scripts/verify-driver.sh
+```
+
+By default the script runs standalone driver/admin/pool e2e tests against
+`POSTER_MONGO_HOST`/`POSTER_MONGO_PORT`, defaulting to `oracle-vm:27017`, then
+starts local `mongo:7` containers for TLS, single-node replica-set, three-node
+failover, retry failpoint, and SCRAM auth smoke tests. Hosted CI sets
+`RUN_STANDALONE_CONTAINER=1` so the same standalone e2e path runs against a
+local `mongo:7` container instead of the developer `oracle-vm` host.
+
 It supplies a series of APIs which can be used to communicate with MongoDB, i.e., **Insert**, **Update**, **Delete** and **Query / Find**.
 
 Here is the [Mongo.ml API docs](http://massd.github.io/mongo/doc/).

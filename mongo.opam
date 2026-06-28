@@ -14,10 +14,21 @@ depends: [
   "dune" {>= "3.16"}
   "bson"
   "eio"
+  "eio_main"
+  "dns-client"
+  "digestif"
+  "mirage-crypto"
+  "mirage-crypto-rng"
+  "ca-certs"
+  "tls"
+  "x509"
+  "ipaddr"
+  "ptime"
+  "yojson" {with-test}
+  "alcotest" {with-test}
 ]
 build: [
   ["dune" "subst"] {dev}
   ["dune" "build" "-p" name "-j" jobs]
 ]
 dev-repo: "git+https://github.com/OlegHQ/mongo-eio.git"
-

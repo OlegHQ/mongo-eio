@@ -41,3 +41,73 @@ let find_one ?skip ~domain_mgr client =
 
 let find_q ?skip ~domain_mgr client query =
   run_blocking ~domain_mgr (fun () -> Mongo.find_q ?skip client query)
+
+type direct_client = {
+  pool : Mongo_pool.t;
+  mutable closed : bool;
+}
+
+let close_direct client =
+  if not client.closed then (
+    client.closed <- true;
+    Mongo_pool.close client.pool)
+
+let connect ~sw ~net:_ ~clock:_ ~config =
+  let client = { pool = Mongo_pool.create config; closed = false } in
+  Eio.Switch.on_release sw (fun () -> close_direct client);
+  Ok client
+
+let with_direct_client ~sw ~net ~clock ~config f =
+  match connect ~sw ~net ~clock ~config with
+  | Error _ as err -> err
+  | Ok client ->
+      Fun.protect ~finally:(fun () -> close_direct client) (fun () -> f client)
+
+let direct_run_command ?session ?command_event_handler client db fields =
+  Mongo_pool.run_command ?session ?command_event_handler client.pool db fields
+
+let direct_with_connection client f = Mongo_pool.with_connection client.pool f
+
+let direct_find client ~db ~collection opts =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.find conn ~db ~collection opts)
+
+let direct_find_one client ~db ~collection filter =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.find_one conn ~db ~collection filter)
+
+let direct_insert_one ?write_concern client ~db ~collection doc =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.insert_one ?write_concern conn ~db ~collection doc)
+
+let direct_insert_many ?options client ~db ~collection docs =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.insert_many ?options conn ~db ~collection docs)
+
+let direct_update_one ?write_concern client ~db ~collection ~upsert selector
+    update_doc =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.update_one ?write_concern conn ~db ~collection ~upsert selector
+        update_doc)
+
+let direct_update_many ?write_concern client ~db ~collection ~upsert selector
+    update_doc =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.update_many ?write_concern conn ~db ~collection ~upsert selector
+        update_doc)
+
+let direct_delete_one ?write_concern client ~db ~collection selector =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.delete_one ?write_concern conn ~db ~collection selector)
+
+let direct_delete_many ?write_concern client ~db ~collection selector =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.delete_many ?write_concern conn ~db ~collection selector)
+
+let direct_count_documents client ~db ~collection ?query () =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.count_documents conn ~db ~collection ?query ())
+
+let direct_estimated_document_count client ~db ~collection =
+  direct_with_connection client (fun conn ->
+      Mongo_crud.estimated_document_count conn ~db ~collection)
