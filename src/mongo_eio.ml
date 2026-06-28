@@ -24,6 +24,12 @@ let with_client ~domain_mgr config f =
 let insert ~domain_mgr client docs =
   run_blocking ~domain_mgr (fun () -> Mongo.insert client docs)
 
+let delete_one ~domain_mgr client query =
+  run_blocking ~domain_mgr (fun () -> Mongo.delete_one client query)
+
+let delete_all ~domain_mgr client query =
+  run_blocking ~domain_mgr (fun () -> Mongo.delete_all client query)
+
 let find ?skip ~domain_mgr client =
   run_blocking ~domain_mgr (fun () -> Mongo.find ?skip client)
 
@@ -32,4 +38,3 @@ let find_one ?skip ~domain_mgr client =
 
 let find_q ?skip ~domain_mgr client query =
   run_blocking ~domain_mgr (fun () -> Mongo.find_q ?skip client query)
-

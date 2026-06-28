@@ -23,6 +23,12 @@ val with_client :
 val insert :
   domain_mgr:_ Eio.Domain_manager.t -> client -> Bson.t list -> unit
 
+val delete_one :
+  domain_mgr:_ Eio.Domain_manager.t -> client -> Bson.t -> unit
+
+val delete_all :
+  domain_mgr:_ Eio.Domain_manager.t -> client -> Bson.t -> unit
+
 val find :
   ?skip:int -> domain_mgr:_ Eio.Domain_manager.t -> client -> MongoReply.t
 
@@ -35,4 +41,3 @@ val find_q :
   client ->
   Bson.t ->
   MongoReply.t
-
