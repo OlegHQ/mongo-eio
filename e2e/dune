@@ -1,0 +1,3 @@
+(executable
+ (name mongo_driver_e2e)
+ (libraries mongo unix))

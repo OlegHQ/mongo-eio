@@ -73,47 +73,210 @@ let get_request_id = cur_timestamp;;
 let send_only (m, str) = MongoSend.send_no_reply m.file_descr str;;
 let send (m,str) = MongoSend.send_with_reply m.file_descr str;;
 
-let insert_in (m, flags, doc_list) = MongoRequest.create_insert (m.db_name, m.collection_name) (get_request_id(),flags) doc_list;;
-let insert m doc_list = wrap_unix send_only (m, wrap_bson insert_in (m, 0l, doc_list));;
+let document fields =
+  List.fold_right
+    (fun (name, element) doc -> Bson.add_element name element doc)
+    fields Bson.empty;;
 
-let update_in (m, flags, s, u) = MongoRequest.create_update (m.db_name, m.collection_name) (get_request_id(), flags) (s,u);;
-let update_one ?(upsert=false) m (s,u) = wrap_unix send_only (m, wrap_bson update_in (m, (if upsert then 1l else 0l), s, u));;
-let update_all ?(upsert=false) m (s,u) = wrap_unix send_only (m, wrap_bson update_in (m, (if upsert then 3l else 2l), s, u));;
+let command_doc m fields =
+  document (fields @ [("$db", Bson.create_string m.db_name)]);;
 
-let delete_in (m, flags, s) = MongoRequest.create_delete (m.db_name, m.collection_name) (get_request_id(), flags) s;;
-let delete_one m s = wrap_unix send_only (m, wrap_bson delete_in (m, 1l, s));;
-let delete_all m s = wrap_unix send_only (m, wrap_bson delete_in (m, 0l, s));;
+let read_message file_descr =
+  let in_ch = Unix.in_channel_of_descr file_descr in
+  let len_bytes = Bytes.create 4 in
+  really_input in_ch len_bytes 0 4;
+  let len_str = Bytes.to_string len_bytes in
+  let (len32, _) = decode_int32 len_str 0 in
+  let len = Int32.to_int len32 in
+  let rest = Bytes.create (len - 4) in
+  really_input in_ch rest 0 (len - 4);
+  len_str ^ Bytes.to_string rest;;
 
-let find_in (m, flags, skip, return, q, s) =
-  MongoRequest.create_query (m.db_name, m.collection_name) (get_request_id(), flags, skip, return) (q,s);;
-let find ?(skip=0) m = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), 0l, Bson.empty, Bson.empty));;
-let find_one ?(skip=0) m = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), 1l, Bson.empty, Bson.empty));;
-let find_of_num ?(skip=0) m num = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), (Int32.of_int num), Bson.empty, Bson.empty));;
-let find_q ?(skip=0) m q = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), 0l, q, Bson.empty));;
-let find_q_one ?(skip=0) m q = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), 1l, q, Bson.empty));;
-let find_q_of_num ?(skip=0) m q num = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), (Int32.of_int num), q, Bson.empty));;
-let find_q_s ?(skip=0) m q s = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), 0l, q, s));;
-let find_q_s_one ?(skip=0) m q s = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), 1l, q, s));;
-let find_q_s_of_num ?(skip=0) m q s num = wrap_unix send (m, wrap_bson find_in (m, 0l, (Int32.of_int skip), (Int32.of_int num), q, s));;
+let create_op_msg request_id body_doc =
+  let body_buf = Buffer.create 128 in
+  encode_int32 body_buf 0l;
+  Buffer.add_char body_buf '\x00';
+  Buffer.add_string body_buf (Bson.encode body_doc);
+  let header =
+    MongoHeader.encode_header
+      (MongoHeader.create_request_header (Buffer.length body_buf) request_id
+         MongoOperation.OP_MSG)
+  in
+  header ^ Buffer.contents body_buf;;
+
+let response_message_doc message =
+  let header = MongoHeader.decode_header (String.sub message 0 (4 * 4)) in
+  match MongoHeader.get_op header with
+  | MongoOperation.OP_MSG ->
+      let (_flags, section_index) = decode_int32 message (4 * 4) in
+      if message.[section_index] <> '\x00' then
+        raise (Mongo_failed "unsupported OP_MSG section kind");
+      let doc_start = section_index + 1 in
+      Bson.decode (String.sub message doc_start (String.length message - doc_start))
+  | MongoOperation.OP_REPLY -> (
+      match MongoReply.get_document_list (MongoReply.decode_reply message) with
+      | doc :: _ -> doc
+      | [] -> raise (Mongo_failed "empty MongoDB reply"))
+  | _ -> raise (Mongo_failed "unexpected MongoDB reply opcode");;
+
+let ok_value doc =
+  try Bson.get_double (Bson.get_element "ok" doc) = 1.0 with
+  | _ -> (
+      try Bson.get_int32 (Bson.get_element "ok" doc) = 1l with
+      | _ -> (
+          try Bson.get_int64 (Bson.get_element "ok" doc) = 1L with
+          | _ -> false));;
+
+let command_error_message doc =
+  let field name =
+    try Some (Bson.get_string (Bson.get_element name doc)) with _ -> None
+  in
+  match (field "errmsg", field "$err") with
+  | Some message, _ | None, Some message -> message
+  | None, None -> "MongoDB command failed";;
+
+let write_error_message doc =
+  let first_error name =
+    try
+      match Bson.get_list (Bson.get_element name doc) with
+      | [] -> None
+      | error :: _ ->
+          let error_doc = Bson.get_doc_element error in
+          Some (Bson.get_string (Bson.get_element "errmsg" error_doc))
+    with _ -> None
+  in
+  match (first_error "writeErrors", first_error "writeConcernErrors") with
+  | Some message, _ | None, Some message -> Some message
+  | None, None -> None;;
+
+let command m fields =
+  let request = create_op_msg (get_request_id ()) (command_doc m fields) in
+  send_only (m, request);
+  let reply = response_message_doc (read_message m.file_descr) in
+  if not (ok_value reply) then raise (Mongo_failed (command_error_message reply));
+  match write_error_message reply with
+  | Some message -> raise (Mongo_failed message)
+  | None -> reply;;
+
+let cursor_batch reply =
+  let cursor = Bson.get_doc_element (Bson.get_element "cursor" reply) in
+  let batch =
+    try Bson.get_element "firstBatch" cursor with
+    | Not_found -> Bson.get_element "nextBatch" cursor
+  in
+  Bson.get_list batch |> List.map Bson.get_doc_element;;
+
+let int_of_bson element =
+  try Int32.to_int (Bson.get_int32 element) with
+  | _ -> (
+      try Int64.to_int (Bson.get_int64 element) with
+      | _ -> int_of_float (Bson.get_double element));;
+
+let find_command ?(skip=0) ?limit ?projection m query =
+  let fields =
+    [
+      ("find", Bson.create_string m.collection_name);
+      ("filter", Bson.create_doc_element query);
+    ]
+  in
+  let fields =
+    if skip > 0 then fields @ [("skip", Bson.create_int32 (Int32.of_int skip))]
+    else fields
+  in
+  let fields =
+    match limit with
+    | Some limit when limit > 0 ->
+        fields @ [("limit", Bson.create_int32 (Int32.of_int limit))]
+    | _ -> fields
+  in
+  let fields =
+    match projection with
+    | Some projection when not (Bson.is_empty projection) ->
+        fields @ [("projection", Bson.create_doc_element projection)]
+    | _ -> fields
+  in
+  command m fields |> cursor_batch |> MongoReply.create;;
+
+let insert_command m doc_list =
+  ignore
+    (command m
+       [
+         ("insert", Bson.create_string m.collection_name);
+         ("documents", Bson.create_doc_element_list doc_list);
+         ("ordered", Bson.create_boolean true);
+       ]);;
+
+let update_command m selector update_doc ~upsert ~multi =
+  let update_spec =
+    document
+      [
+        ("q", Bson.create_doc_element selector);
+        ("u", Bson.create_doc_element update_doc);
+        ("upsert", Bson.create_boolean upsert);
+        ("multi", Bson.create_boolean multi);
+      ]
+  in
+  ignore
+    (command m
+       [
+         ("update", Bson.create_string m.collection_name);
+         ("updates", Bson.create_doc_element_list [update_spec]);
+         ("ordered", Bson.create_boolean true);
+       ]);;
+
+let delete_command m selector ~limit =
+  let delete_spec =
+    document
+      [
+        ("q", Bson.create_doc_element selector);
+        ("limit", Bson.create_int32 (Int32.of_int limit));
+      ]
+  in
+  ignore
+    (command m
+       [
+         ("delete", Bson.create_string m.collection_name);
+         ("deletes", Bson.create_doc_element_list [delete_spec]);
+         ("ordered", Bson.create_boolean true);
+       ]);;
+
+let insert m doc_list = wrap_unix (fun m -> insert_command m doc_list) m;;
+
+let update_one ?(upsert=false) m (s,u) = wrap_unix (fun m -> update_command m s u ~upsert ~multi:false) m;;
+let update_all ?(upsert=false) m (s,u) = wrap_unix (fun m -> update_command m s u ~upsert ~multi:true) m;;
+
+let delete_one m s = wrap_unix (fun m -> delete_command m s ~limit:1) m;;
+let delete_all m s = wrap_unix (fun m -> delete_command m s ~limit:0) m;;
+
+let find ?(skip=0) m = wrap_unix (fun m -> find_command ~skip m Bson.empty) m;;
+let find_one ?(skip=0) m = wrap_unix (fun m -> find_command ~skip ~limit:1 m Bson.empty) m;;
+let find_of_num ?(skip=0) m num = wrap_unix (fun m -> find_command ~skip ~limit:num m Bson.empty) m;;
+let find_q ?(skip=0) m q = wrap_unix (fun m -> find_command ~skip m q) m;;
+let find_q_one ?(skip=0) m q = wrap_unix (fun m -> find_command ~skip ~limit:1 m q) m;;
+let find_q_of_num ?(skip=0) m q num = wrap_unix (fun m -> find_command ~skip ~limit:num m q) m;;
+let find_q_s ?(skip=0) m q s = wrap_unix (fun m -> find_command ~skip ~projection:s m q) m;;
+let find_q_s_one ?(skip=0) m q s = wrap_unix (fun m -> find_command ~skip ~limit:1 ~projection:s m q) m;;
+let find_q_s_of_num ?(skip=0) m q s num = wrap_unix (fun m -> find_command ~skip ~limit:num ~projection:s m q) m;;
 
 let count ?skip ?limit ?(query=Bson.empty) m =
-  let c_bson = Bson.add_element "query" (Bson.create_doc_element query) Bson.empty in
-  let c_bson = Bson.add_element "count" (Bson.create_string m.collection_name) c_bson in
-  let c_bson =
-    match limit with
-      | Some n -> Bson.add_element "limit" (Bson.create_int32 (Int32.of_int n)) c_bson
-      | None -> c_bson
+  let fields =
+    [
+      ("count", Bson.create_string m.collection_name);
+      ("query", Bson.create_doc_element query);
+    ]
   in
-  let c_bson =
+  let fields =
     match skip with
-      | Some n -> Bson.add_element "skip" (Bson.create_int32 (Int32.of_int n)) c_bson
-      | None -> c_bson
+    | Some n -> fields @ [("skip", Bson.create_int32 (Int32.of_int n))]
+    | None -> fields
   in
-
-  let m = change_collection m "$cmd" in
-  let r = find_q_one m c_bson in
-  let d = List.nth (MongoReply.get_document_list r) 0 in
-  int_of_float (Bson.get_double (Bson.get_element "n" d))
+  let fields =
+    match limit with
+    | Some n -> fields @ [("limit", Bson.create_int32 (Int32.of_int n))]
+    | None -> fields
+  in
+  let reply = command m fields in
+  int_of_bson (Bson.get_element "n" reply)
 
 
 let get_more_in (m, c, num) = MongoRequest.create_get_more (m.db_name, m.collection_name) (get_request_id(), Int32.of_int num) c;;
@@ -124,18 +287,18 @@ let kill_cursors_in c_list = MongoRequest.create_kill_cursors (get_request_id())
 let kill_cursors m c_list = wrap_unix send_only (m, wrap_bson kill_cursors_in c_list);;
 
 let drop_database m =
-  let m = change_collection m "$cmd" in
-  find_q_one m (Bson.add_element "dropDatabase" (Bson.create_int32 1l) Bson.empty)
+  command m [("dropDatabase", Bson.create_int32 1l)] |> fun doc ->
+  MongoReply.create [doc]
 
 let drop_collection m =
-  let m_ = change_collection m "$cmd" in
-  find_q_one m_ (Bson.add_element "drop" (Bson.create_string m.collection_name) Bson.empty)
+  command m [("drop", Bson.create_string m.collection_name)] |> fun doc ->
+  MongoReply.create [doc]
 
 
 (** INDEX **)
 let get_indexes m =
-  let m_ = change_collection m "system.indexes" in
-  find_q m_ (Bson.add_element "ns" (Bson.create_string (m.db_name ^ "." ^ m.collection_name)) Bson.empty)
+  command m [("listIndexes", Bson.create_string m.collection_name)]
+  |> cursor_batch |> MongoReply.create
 
 type index_option =
   | Background of bool
@@ -211,11 +374,12 @@ let ensure_index m key_bson options =
     else main_bson
   in
 
-  let main_bson = Bson.add_element "ns" (Bson.create_string (m.db_name ^ "." ^ m.collection_name)) main_bson in
-
-  let system_indexes_m = change_collection m "system.indexes" in
-
-  insert system_indexes_m [main_bson];;
+  ignore
+    (command m
+       [
+         ("createIndexes", Bson.create_string m.collection_name);
+         ("indexes", Bson.create_doc_element_list [main_bson]);
+       ]);;
 
 
 let ensure_simple_index ?(options=[]) m field =
@@ -234,10 +398,12 @@ let ensure_multi_simple_index ?(options=[]) m fields =
   ensure_index m key_bson options
 
 let drop_index m index_name =
-  let index_bson = Bson.add_element "index" (Bson.create_string index_name) Bson.empty in
-  let delete_bson = Bson.add_element "deleteIndexes" (Bson.create_string m.collection_name) index_bson in
-  let m = change_collection m "$cmd" in
-  find_q_one m delete_bson
+  command m
+    [
+      ("dropIndexes", Bson.create_string m.collection_name);
+      ("index", Bson.create_string index_name);
+    ]
+  |> fun doc -> MongoReply.create [doc]
 
 let drop_all_index m =
   drop_index m "*"

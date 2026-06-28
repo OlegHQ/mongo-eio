@@ -17,6 +17,16 @@ let get_starting_from r = r.starting_from;;
 let get_num_returned r = r.num_returned;;
 let get_document_list r = r.document_list;;
 
+let create document_list =
+  {
+    header = MongoHeader.create_header 0 0l 0l MongoOperation.OP_REPLY;
+    response_flags = 0l;
+    cursor_id = 0L;
+    starting_from = 0l;
+    num_returned = Int32.of_int (List.length document_list);
+    document_list;
+  };;
+
 let decode_reply_doc str =
   (*print_endline str;
   Printf.printf "doc str len = %d\n" (String.length str);*)

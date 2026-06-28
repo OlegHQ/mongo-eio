@@ -4,7 +4,7 @@ exception MongoAdmin_failed of string;;
 
 type t = Mongo.t;;
 
-type cmd = { name: string; query: string};;
+type cmd = { query: string};;
 
 let admin_db_name = "admin";;
 let admin_collection_name = "$cmd";;
@@ -36,7 +36,6 @@ let create_cmd name =
   let e_1 = Bson.create_int32 (1l) in
   let cmd_doc name = Bson.add_element name e_1 Bson.empty in
   {
-    name=name; 
     query =  
       let find_in (flags, skip, return, q, s) = 
 	MongoRequest.create_query (admin_db_name, admin_collection_name) (get_request_id(), flags, skip, return) (q,s) in

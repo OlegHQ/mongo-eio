@@ -8,7 +8,8 @@ type t =
   | OP_QUERY
   | OP_GET_MORE
   | OP_DELETE
-  | OP_KILL_CURSORS;;
+  | OP_KILL_CURSORS
+  | OP_MSG;;
 
 let to_code = function
   | OP_REPLY -> 1l
@@ -18,7 +19,8 @@ let to_code = function
   | OP_QUERY -> 2004l
   | OP_GET_MORE -> 2005l
   | OP_DELETE -> 2006l
-  | OP_KILL_CURSORS -> 2007l;;
+  | OP_KILL_CURSORS -> 2007l
+  | OP_MSG -> 2013l;;
 
 let of_code = function
   | 1l -> OP_REPLY
@@ -29,8 +31,8 @@ let of_code = function
   | 2005l -> OP_GET_MORE
   | 2006l -> OP_DELETE
   | 2007l -> OP_KILL_CURSORS
+  | 2013l -> OP_MSG
   | _ -> raise Unknown_op_code;;
-
 
 
 

@@ -43,10 +43,9 @@ let decode_int64 str cur =
       decode (i-1) new_acc
   in (decode (cur+7) 0L, cur+8)
 
-let rec next_x00 str cur = String.index_from str cur '\x00';;
+let next_x00 str cur = String.index_from str cur '\x00';;
 
 let decode_cstring str cur = 
   let x00 = next_x00 str cur in
   if x00 = -1 then raise Bson.Malformed_bson
   else (String.sub str cur (x00-cur), x00+1);;
-

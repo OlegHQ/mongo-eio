@@ -28,8 +28,11 @@ val get_num_returned: t -> int32;;
 (** get the document list returned out of a MongoReply *)
 val get_document_list: t -> Bson.t list;;
 
+(** create a reply value from already-decoded documents. Used by modern command
+    paths that receive OP_MSG replies instead of legacy OP_REPLY query replies. *)
+val create: Bson.t list -> t;;
+
 (** {6 Operations} *)
 
 (** convert a MongoReply to a human readable string *)
 val to_string: t -> string;;
-

@@ -41,7 +41,7 @@ let decode_header str =
   let (message_len, next) = decode_int32 str 0 in
   let (request_id, next) = decode_int32 str next in
   let (response_to, next) = decode_int32 str next in
-  let (op_code, next) = decode_int32 str next in
+  let (op_code, _next) = decode_int32 str next in
   {
     message_len = message_len;
     request_id = request_id;
@@ -64,4 +64,3 @@ let to_string h =
   Buffer.add_string buf (Int32.to_string ((MongoOperation.to_code h.op)));
   Buffer.add_string buf "\n";
   Buffer.contents buf;;
-

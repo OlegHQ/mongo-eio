@@ -14,7 +14,8 @@ type t =
   | OP_QUERY
   | OP_GET_MORE
   | OP_DELETE
-  | OP_KILL_CURSORS;;
+  | OP_KILL_CURSORS
+  | OP_MSG;;
 
 (** {6 Convert between operation and int32 code} *)
 

@@ -24,7 +24,7 @@ let create_insert (db_name,collection_name) (request_id,flags) insert_doc_list =
   add_doc insert_doc_list;
   combine_header_body request_id OP_INSERT body_buf;;
 
-let create_select_body_buf (db_name,collection_name) (request_id,flags) selector_doc =
+let create_select_body_buf (db_name,collection_name) (_request_id,flags) selector_doc =
   let body_buf = Buffer.create 32 in
   encode_int32 body_buf 0l;
   encode_cstring body_buf (db_name^"."^collection_name);
