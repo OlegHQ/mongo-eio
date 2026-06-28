@@ -30,6 +30,9 @@ let delete_one ~domain_mgr client query =
 let delete_all ~domain_mgr client query =
   run_blocking ~domain_mgr (fun () -> Mongo.delete_all client query)
 
+let ensure_simple_index ?options ~domain_mgr client field =
+  run_blocking ~domain_mgr (fun () -> Mongo.ensure_simple_index ?options client field)
+
 let find ?skip ~domain_mgr client =
   run_blocking ~domain_mgr (fun () -> Mongo.find ?skip client)
 

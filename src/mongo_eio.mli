@@ -29,6 +29,13 @@ val delete_one :
 val delete_all :
   domain_mgr:_ Eio.Domain_manager.t -> client -> Bson.t -> unit
 
+val ensure_simple_index :
+  ?options:Mongo.index_option list ->
+  domain_mgr:_ Eio.Domain_manager.t ->
+  client ->
+  string ->
+  unit
+
 val find :
   ?skip:int -> domain_mgr:_ Eio.Domain_manager.t -> client -> MongoReply.t
 
