@@ -1,0 +1,23 @@
+opam-version: "2.0"
+synopsis: "OCaml MongoDB driver with additive Eio wrappers"
+description: "Modern Dune packaging for MassD mongo.ml plus additive OCaml 5/Eio wrappers."
+maintainer: "OlegHQ"
+authors: [
+  "Marc Simon"
+  "Dr. Xinuo Chen"
+]
+license: "MIT"
+homepage: "https://github.com/OlegHQ/mongo-eio"
+bug-reports: "https://github.com/OlegHQ/mongo-eio/issues"
+depends: [
+  "ocaml" {>= "5.0"}
+  "dune" {>= "3.16"}
+  "bson"
+  "eio"
+]
+build: [
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+https://github.com/OlegHQ/mongo-eio.git"
+

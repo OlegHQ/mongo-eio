@@ -1,0 +1,19 @@
+(library
+ (name mongo)
+ (public_name mongo)
+ (wrapped false)
+ (modules
+  Mongo
+  MongoAdmin
+  MongoAdmin_eio
+  MongoHeader
+  MongoMetaOp
+  MongoOperation
+  MongoQueryOp
+  MongoReply
+  MongoRequest
+  MongoSend
+  MongoUtils
+  Mongo_eio)
+ (libraries unix bson eio))
+
