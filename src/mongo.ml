@@ -21,12 +21,6 @@ let change_collection m c =
       collection_name = c ;
   }
 
-let wrap_bson f arg =
-  try (f arg) with
-    | Bson.Invalid_objectId -> raise (Mongo_failed "Bson.Invalid_objectId")
-    | Bson.Wrong_bson_type -> raise (Mongo_failed "Wrong_bson_type when encoding bson doc")
-    | Bson.Malformed_bson -> raise (Mongo_failed "Malformed_bson when decoding bson");;
-
 let wrap_unix f arg =
   try (f arg) with
     | Unix.Unix_error (e, _, _) -> raise (Mongo_failed (Unix.error_message e));;
@@ -71,7 +65,6 @@ let destroy m = wrap_unix Unix.close m.file_descr;;
 let get_request_id = cur_timestamp;;
 
 let send_only (m, str) = MongoSend.send_no_reply m.file_descr str;;
-let send (m,str) = MongoSend.send_with_reply m.file_descr str;;
 
 let document fields =
   List.fold_right
@@ -279,12 +272,34 @@ let count ?skip ?limit ?(query=Bson.empty) m =
   int_of_bson (Bson.get_element "n" reply)
 
 
-let get_more_in (m, c, num) = MongoRequest.create_get_more (m.db_name, m.collection_name) (get_request_id(), Int32.of_int num) c;;
-let get_more_of_num m c num = wrap_unix send (m, wrap_bson get_more_in (m, c, num));;
+let get_more_of_num m c num =
+  wrap_unix
+    (fun m ->
+      let fields =
+        [
+          ("getMore", Bson.create_int64 c);
+          ("collection", Bson.create_string m.collection_name);
+        ]
+      in
+      let fields =
+        if num > 0 then
+          fields @ [("batchSize", Bson.create_int32 (Int32.of_int num))]
+        else fields
+      in
+      command m fields |> cursor_batch |> MongoReply.create)
+    m;;
 let get_more m c = get_more_of_num m c 0;;
 
-let kill_cursors_in c_list = MongoRequest.create_kill_cursors (get_request_id()) c_list;;
-let kill_cursors m c_list = wrap_unix send_only (m, wrap_bson kill_cursors_in c_list);;
+let kill_cursors m c_list =
+  wrap_unix
+    (fun m ->
+      ignore
+        (command m
+           [
+             ("killCursors", Bson.create_string m.collection_name);
+             ("cursors", Bson.create_list (List.map Bson.create_int64 c_list));
+           ]))
+    m;;
 
 let drop_database m =
   command m [("dropDatabase", Bson.create_int32 1l)] |> fun doc ->
