@@ -153,6 +153,14 @@ val direct_delete_many :
   Bson.t ->
   (Mongo_crud.write_result, Mongo_error.t) result
 
+val direct_ensure_simple_index :
+  direct_client ->
+  db:string ->
+  collection:string ->
+  field:string ->
+  Mongo_index.index_option list ->
+  (unit, Mongo_error.t) result
+
 val direct_count_documents :
   direct_client ->
   db:string ->
