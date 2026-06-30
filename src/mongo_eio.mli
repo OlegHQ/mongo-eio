@@ -161,6 +161,14 @@ val direct_ensure_simple_index :
   Mongo_index.index_option list ->
   (unit, Mongo_error.t) result
 
+val direct_ensure_index :
+  direct_client ->
+  db:string ->
+  collection:string ->
+  Bson.t ->
+  Mongo_index.index_option list ->
+  (unit, Mongo_error.t) result
+
 val direct_count_documents :
   direct_client ->
   db:string ->

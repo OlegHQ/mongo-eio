@@ -108,6 +108,10 @@ let direct_ensure_simple_index client ~db ~collection ~field options =
   direct_with_connection client (fun conn ->
       Mongo_index.ensure_simple_index conn ~db ~collection field options)
 
+let direct_ensure_index client ~db ~collection key_bson options =
+  direct_with_connection client (fun conn ->
+      Mongo_index.ensure_index conn ~db ~collection key_bson options)
+
 let direct_count_documents client ~db ~collection ?query () =
   direct_with_connection client (fun conn ->
       Mongo_crud.count_documents conn ~db ~collection ?query ())
