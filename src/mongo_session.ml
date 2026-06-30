@@ -23,6 +23,28 @@ let next_txn t =
   t.txn_number
 
 let command_context t =
-  Mongo_command.{ session_id = Some t.id; txn_number = Some (next_txn t) }
+  Mongo_command.
+    {
+      session_id = Some t.id;
+      txn_number = Some (next_txn t);
+      start_transaction = None;
+      autocommit = None;
+    }
 
-let implicit_context t = Mongo_command.{ session_id = Some t.id; txn_number = None }
+let implicit_context t =
+  Mongo_command.
+    {
+      session_id = Some t.id;
+      txn_number = None;
+      start_transaction = None;
+      autocommit = None;
+    }
+
+let transaction_context ?(start = false) t ~txn_number =
+  Mongo_command.
+    {
+      session_id = Some t.id;
+      txn_number = Some txn_number;
+      start_transaction = (if start then Some true else None);
+      autocommit = Some false;
+    }

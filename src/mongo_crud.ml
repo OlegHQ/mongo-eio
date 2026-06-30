@@ -87,18 +87,19 @@ let find_fields collection opts =
   |> add "batchSize"
        (Option.map (fun n -> Bson.create_int32 (Int32.of_int n)) opts.batch_size)
 
-let find conn ~db ~collection opts =
-  Mongo_connection.run_command ?read_concern:opts.read_concern conn db
+let find ?session conn ~db ~collection opts =
+  Mongo_connection.run_command ?session ?read_concern:opts.read_concern conn db
     (find_fields collection opts)
   |> Result.map (fun (response : Mongo_command.response) ->
          Mongo_command.cursor_batch response.body)
 
-let find_one conn ~db ~collection filter =
+let find_one ?session conn ~db ~collection filter =
   let opts = { (default_find collection filter) with limit = Some 1 } in
-  find conn ~db ~collection opts |> Result.map (function [] -> None | h :: _ -> Some h)
+  find ?session conn ~db ~collection opts
+  |> Result.map (function [] -> None | h :: _ -> Some h)
 
-let insert conn ~db ~collection ?write_concern ~ordered docs =
-  Mongo_connection.run_command ?write_concern conn db
+let insert ?session conn ~db ~collection ?write_concern ~ordered docs =
+  Mongo_connection.run_command ?session ?write_concern conn db
     [
       ("insert", Bson.create_string collection);
       ("documents", Bson.create_doc_element_list docs);
@@ -107,14 +108,14 @@ let insert conn ~db ~collection ?write_concern ~ordered docs =
   |> Result.map (fun (response : Mongo_command.response) ->
          write_result ~inserted_count:(int_field "n" response.body) response)
 
-let insert_one ?write_concern conn ~db ~collection doc =
-  insert conn ~db ~collection ?write_concern ~ordered:true [ doc ]
+let insert_one ?session ?write_concern conn ~db ~collection doc =
+  insert ?session conn ~db ~collection ?write_concern ~ordered:true [ doc ]
 
-let insert_many ?(options = default_insert) conn ~db ~collection docs =
-  insert conn ~db ~collection ?write_concern:options.write_concern
+let insert_many ?session ?(options = default_insert) conn ~db ~collection docs =
+  insert ?session conn ~db ~collection ?write_concern:options.write_concern
     ~ordered:options.ordered docs
 
-let update conn ~db ~collection ?write_concern ~multi selector update_doc
+let update ?session conn ~db ~collection ?write_concern ~multi selector update_doc
     ~upsert =
   let update_spec =
     Mongo_command.document
@@ -125,7 +126,7 @@ let update conn ~db ~collection ?write_concern ~multi selector update_doc
         ("multi", Bson.create_boolean multi);
       ]
   in
-  Mongo_connection.run_command ?write_concern conn db
+  Mongo_connection.run_command ?session ?write_concern conn db
     [
       ("update", Bson.create_string collection);
       ("updates", Bson.create_doc_element_list [ update_spec ]);
@@ -133,18 +134,18 @@ let update conn ~db ~collection ?write_concern ~multi selector update_doc
     ]
   |> Result.map (fun (response : Mongo_command.response) ->
          write_result ~matched_count:(int_field "n" response.body)
-           ?modified_count:(optional_int_field "nModified" response.body)
-           response)
+         ?modified_count:(optional_int_field "nModified" response.body)
+         response)
 
-let update_one ?write_concern conn ~db ~collection ~upsert selector update_doc =
-  update conn ~db ~collection ?write_concern ~multi:false ~upsert selector
+let update_one ?session ?write_concern conn ~db ~collection ~upsert selector update_doc =
+  update ?session conn ~db ~collection ?write_concern ~multi:false ~upsert selector
     update_doc
 
-let update_many ?write_concern conn ~db ~collection ~upsert selector update_doc =
-  update conn ~db ~collection ?write_concern ~multi:true ~upsert selector
+let update_many ?session ?write_concern conn ~db ~collection ~upsert selector update_doc =
+  update ?session conn ~db ~collection ?write_concern ~multi:true ~upsert selector
     update_doc
 
-let delete conn ~db ~collection ?write_concern ~limit selector =
+let delete ?session conn ~db ~collection ?write_concern ~limit selector =
   let delete_spec =
     Mongo_command.document
       [
@@ -152,7 +153,7 @@ let delete conn ~db ~collection ?write_concern ~limit selector =
         ("limit", Bson.create_int32 (Int32.of_int limit));
       ]
   in
-  Mongo_connection.run_command ?write_concern conn db
+  Mongo_connection.run_command ?session ?write_concern conn db
     [
       ("delete", Bson.create_string collection);
       ("deletes", Bson.create_doc_element_list [ delete_spec ]);
@@ -161,15 +162,15 @@ let delete conn ~db ~collection ?write_concern ~limit selector =
   |> Result.map (fun (response : Mongo_command.response) ->
          write_result ~deleted_count:(int_field "n" response.body) response)
 
-let delete_one ?write_concern conn ~db ~collection selector =
-  delete conn ~db ~collection ?write_concern ~limit:1 selector
+let delete_one ?session ?write_concern conn ~db ~collection selector =
+  delete ?session conn ~db ~collection ?write_concern ~limit:1 selector
 
-let delete_many ?write_concern conn ~db ~collection selector =
-  delete conn ~db ~collection ?write_concern ~limit:0 selector
+let delete_many ?session ?write_concern conn ~db ~collection selector =
+  delete ?session conn ~db ~collection ?write_concern ~limit:0 selector
 
-let count_documents conn ~db ~collection ?query () =
+let count_documents ?session conn ~db ~collection ?query () =
   let query = Option.value query ~default:Bson.empty in
-  Mongo_connection.run_command conn db
+  Mongo_connection.run_command ?session conn db
     [
       ("count", Bson.create_string collection);
       ("query", Bson.create_doc_element query);
@@ -177,5 +178,5 @@ let count_documents conn ~db ~collection ?query () =
   |> Result.map (fun (response : Mongo_command.response) ->
          Mongo_command.int_of_bson (Bson.get_element "n" response.body))
 
-let estimated_document_count conn ~db ~collection =
-  count_documents conn ~db ~collection ()
+let estimated_document_count ?session conn ~db ~collection =
+  count_documents ?session conn ~db ~collection ()

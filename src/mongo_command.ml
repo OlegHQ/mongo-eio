@@ -185,6 +185,8 @@ let append_txn_number txn command =
 type session_context = {
   session_id : string option;
   txn_number : int64 option;
+  start_transaction : bool option;
+  autocommit : bool option;
 }
 
 let enrich_command ~db ?session ?read_preference ?(read_preference_tags = [])
@@ -208,9 +210,10 @@ let enrich_command ~db ?session ?read_preference ?(read_preference_tags = [])
     | None -> command
     | Some concern -> append_write_concern concern command
   in
-  match session with
-  | None -> command
-  | Some ctx -> (
+  let command =
+    match session with
+    | None -> command
+    | Some ctx -> (
       let command =
         match ctx.session_id with
         | None -> command
@@ -219,6 +222,17 @@ let enrich_command ~db ?session ?read_preference ?(read_preference_tags = [])
       match ctx.txn_number with
       | None -> command
       | Some txn -> append_txn_number txn command)
+  in
+  let command =
+    match session with
+    | Some { start_transaction = Some value; _ } ->
+        add_last "startTransaction" (Bson.create_boolean value) command
+    | Some { start_transaction = None; _ } | None -> command
+  in
+  match session with
+  | Some { autocommit = Some value; _ } ->
+      add_last "autocommit" (Bson.create_boolean value) command
+  | Some { autocommit = None; _ } | None -> command
 
 let run_transport ?timeout_ms ?session ?read_preference ?command_event_handler
     ?(read_preference_tags = []) ?max_staleness_seconds ?read_concern

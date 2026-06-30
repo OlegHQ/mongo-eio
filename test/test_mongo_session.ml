@@ -19,6 +19,20 @@ let test_lsid_uses_uuid_binary_subtype () =
   let id = Bson.get_uuid_binary (Bson.get_element "id" lsid) in
   check string "lsid id" session.id id
 
+let test_transaction_context_fields () =
+  let session = Mongo_session.create () in
+  let command =
+    Mongo_command.enrich_command ~db:"admin"
+      ~session:(Mongo_session.transaction_context ~start:true session ~txn_number:7L)
+      [ ("insert", Bson.create_string "posts") ]
+  in
+  check int64 "txn number" 7L
+    (Bson.get_int64 (Bson.get_element "txnNumber" command));
+  check bool "start transaction" true
+    (Bson.get_boolean (Bson.get_element "startTransaction" command));
+  check bool "autocommit" false
+    (Bson.get_boolean (Bson.get_element "autocommit" command))
+
 let () =
   run "mongo_session"
     [
@@ -28,5 +42,7 @@ let () =
             test_session_id_is_uuid_v4;
           test_case "lsid uses UUID binary subtype" `Quick
             test_lsid_uses_uuid_binary_subtype;
+          test_case "transaction context fields" `Quick
+            test_transaction_context_fields;
         ] );
     ]

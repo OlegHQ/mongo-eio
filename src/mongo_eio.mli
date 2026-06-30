@@ -88,6 +88,7 @@ val direct_with_connection :
   ('a, Mongo_error.t) result
 
 val direct_find :
+  ?session:Mongo_command.session_context ->
   direct_client ->
   db:string ->
   collection:string ->
@@ -95,6 +96,7 @@ val direct_find :
   (Bson.t list, Mongo_error.t) result
 
 val direct_find_one :
+  ?session:Mongo_command.session_context ->
   direct_client ->
   db:string ->
   collection:string ->
@@ -102,6 +104,7 @@ val direct_find_one :
   (Bson.t option, Mongo_error.t) result
 
 val direct_insert_one :
+  ?session:Mongo_command.session_context ->
   ?write_concern:Mongo_command.write_concern ->
   direct_client ->
   db:string ->
@@ -110,6 +113,7 @@ val direct_insert_one :
   (Mongo_crud.write_result, Mongo_error.t) result
 
 val direct_insert_many :
+  ?session:Mongo_command.session_context ->
   ?options:Mongo_crud.insert_options ->
   direct_client ->
   db:string ->
@@ -118,6 +122,7 @@ val direct_insert_many :
   (Mongo_crud.write_result, Mongo_error.t) result
 
 val direct_update_one :
+  ?session:Mongo_command.session_context ->
   ?write_concern:Mongo_command.write_concern ->
   direct_client ->
   db:string ->
@@ -128,6 +133,7 @@ val direct_update_one :
   (Mongo_crud.write_result, Mongo_error.t) result
 
 val direct_update_many :
+  ?session:Mongo_command.session_context ->
   ?write_concern:Mongo_command.write_concern ->
   direct_client ->
   db:string ->
@@ -138,6 +144,7 @@ val direct_update_many :
   (Mongo_crud.write_result, Mongo_error.t) result
 
 val direct_delete_one :
+  ?session:Mongo_command.session_context ->
   ?write_concern:Mongo_command.write_concern ->
   direct_client ->
   db:string ->
@@ -146,6 +153,7 @@ val direct_delete_one :
   (Mongo_crud.write_result, Mongo_error.t) result
 
 val direct_delete_many :
+  ?session:Mongo_command.session_context ->
   ?write_concern:Mongo_command.write_concern ->
   direct_client ->
   db:string ->
@@ -170,6 +178,7 @@ val direct_ensure_index :
   (unit, Mongo_error.t) result
 
 val direct_count_documents :
+  ?session:Mongo_command.session_context ->
   direct_client ->
   db:string ->
   collection:string ->
@@ -178,6 +187,7 @@ val direct_count_documents :
   (int, Mongo_error.t) result
 
 val direct_estimated_document_count :
+  ?session:Mongo_command.session_context ->
   direct_client ->
   db:string ->
   collection:string ->

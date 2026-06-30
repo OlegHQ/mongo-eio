@@ -54,6 +54,8 @@ type command_event_handler = command_event -> unit
 type session_context = {
   session_id : string option;
   txn_number : int64 option;
+  start_transaction : bool option;
+  autocommit : bool option;
 }
 
 val document : (string * Bson.element) list -> Bson.t

@@ -68,41 +68,41 @@ let direct_run_command ?session ?command_event_handler client db fields =
 
 let direct_with_connection client f = Mongo_pool.with_connection client.pool f
 
-let direct_find client ~db ~collection opts =
+let direct_find ?session client ~db ~collection opts =
   direct_with_connection client (fun conn ->
-      Mongo_crud.find conn ~db ~collection opts)
+      Mongo_crud.find ?session conn ~db ~collection opts)
 
-let direct_find_one client ~db ~collection filter =
+let direct_find_one ?session client ~db ~collection filter =
   direct_with_connection client (fun conn ->
-      Mongo_crud.find_one conn ~db ~collection filter)
+      Mongo_crud.find_one ?session conn ~db ~collection filter)
 
-let direct_insert_one ?write_concern client ~db ~collection doc =
+let direct_insert_one ?session ?write_concern client ~db ~collection doc =
   direct_with_connection client (fun conn ->
-      Mongo_crud.insert_one ?write_concern conn ~db ~collection doc)
+      Mongo_crud.insert_one ?session ?write_concern conn ~db ~collection doc)
 
-let direct_insert_many ?options client ~db ~collection docs =
+let direct_insert_many ?session ?options client ~db ~collection docs =
   direct_with_connection client (fun conn ->
-      Mongo_crud.insert_many ?options conn ~db ~collection docs)
+      Mongo_crud.insert_many ?session ?options conn ~db ~collection docs)
 
-let direct_update_one ?write_concern client ~db ~collection ~upsert selector
+let direct_update_one ?session ?write_concern client ~db ~collection ~upsert selector
     update_doc =
   direct_with_connection client (fun conn ->
-      Mongo_crud.update_one ?write_concern conn ~db ~collection ~upsert selector
+      Mongo_crud.update_one ?session ?write_concern conn ~db ~collection ~upsert selector
         update_doc)
 
-let direct_update_many ?write_concern client ~db ~collection ~upsert selector
+let direct_update_many ?session ?write_concern client ~db ~collection ~upsert selector
     update_doc =
   direct_with_connection client (fun conn ->
-      Mongo_crud.update_many ?write_concern conn ~db ~collection ~upsert selector
+      Mongo_crud.update_many ?session ?write_concern conn ~db ~collection ~upsert selector
         update_doc)
 
-let direct_delete_one ?write_concern client ~db ~collection selector =
+let direct_delete_one ?session ?write_concern client ~db ~collection selector =
   direct_with_connection client (fun conn ->
-      Mongo_crud.delete_one ?write_concern conn ~db ~collection selector)
+      Mongo_crud.delete_one ?session ?write_concern conn ~db ~collection selector)
 
-let direct_delete_many ?write_concern client ~db ~collection selector =
+let direct_delete_many ?session ?write_concern client ~db ~collection selector =
   direct_with_connection client (fun conn ->
-      Mongo_crud.delete_many ?write_concern conn ~db ~collection selector)
+      Mongo_crud.delete_many ?session ?write_concern conn ~db ~collection selector)
 
 let direct_ensure_simple_index client ~db ~collection ~field options =
   direct_with_connection client (fun conn ->
@@ -112,10 +112,10 @@ let direct_ensure_index client ~db ~collection key_bson options =
   direct_with_connection client (fun conn ->
       Mongo_index.ensure_index conn ~db ~collection key_bson options)
 
-let direct_count_documents client ~db ~collection ?query () =
+let direct_count_documents ?session client ~db ~collection ?query () =
   direct_with_connection client (fun conn ->
-      Mongo_crud.count_documents conn ~db ~collection ?query ())
+      Mongo_crud.count_documents ?session conn ~db ~collection ?query ())
 
-let direct_estimated_document_count client ~db ~collection =
+let direct_estimated_document_count ?session client ~db ~collection =
   direct_with_connection client (fun conn ->
-      Mongo_crud.estimated_document_count conn ~db ~collection)
+      Mongo_crud.estimated_document_count ?session conn ~db ~collection)
