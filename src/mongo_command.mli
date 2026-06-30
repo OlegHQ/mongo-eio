@@ -56,6 +56,7 @@ type session_context = {
   txn_number : int64 option;
   start_transaction : bool option;
   autocommit : bool option;
+  read_concern : read_concern option;
 }
 
 val document : (string * Bson.element) list -> Bson.t

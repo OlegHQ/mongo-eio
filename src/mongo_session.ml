@@ -29,6 +29,7 @@ let command_context t =
       txn_number = Some (next_txn t);
       start_transaction = None;
       autocommit = None;
+      read_concern = None;
     }
 
 let implicit_context t =
@@ -38,13 +39,15 @@ let implicit_context t =
       txn_number = None;
       start_transaction = None;
       autocommit = None;
+      read_concern = None;
     }
 
-let transaction_context ?(start = false) t ~txn_number =
+let transaction_context ?read_concern ?(start = false) t ~txn_number =
   Mongo_command.
     {
       session_id = Some t.id;
       txn_number = Some txn_number;
       start_transaction = (if start then Some true else None);
       autocommit = Some false;
+      read_concern;
     }

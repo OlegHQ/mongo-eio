@@ -187,6 +187,7 @@ type session_context = {
   txn_number : int64 option;
   start_transaction : bool option;
   autocommit : bool option;
+  read_concern : read_concern option;
 }
 
 let enrich_command ~db ?session ?read_preference ?(read_preference_tags = [])
@@ -199,6 +200,15 @@ let enrich_command ~db ?session ?read_preference ?(read_preference_tags = [])
     | Some pref ->
         append_read_preference ~tag_sets:read_preference_tags
           ?max_staleness_seconds pref command
+  in
+  let read_concern =
+    match read_concern with
+    | Some _ -> read_concern
+    | None -> (
+        match session with
+        | Some { start_transaction = Some true; read_concern = Some concern; _ } ->
+            Some concern
+        | Some _ | None -> None)
   in
   let command =
     match read_concern with

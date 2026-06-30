@@ -23,7 +23,9 @@ let test_transaction_context_fields () =
   let session = Mongo_session.create () in
   let command =
     Mongo_command.enrich_command ~db:"admin"
-      ~session:(Mongo_session.transaction_context ~start:true session ~txn_number:7L)
+      ~session:
+        (Mongo_session.transaction_context ~read_concern:Mongo_command.Snapshot
+           ~start:true session ~txn_number:7L)
       [ ("insert", Bson.create_string "posts") ]
   in
   check int64 "txn number" 7L
@@ -31,7 +33,12 @@ let test_transaction_context_fields () =
   check bool "start transaction" true
     (Bson.get_boolean (Bson.get_element "startTransaction" command));
   check bool "autocommit" false
-    (Bson.get_boolean (Bson.get_element "autocommit" command))
+    (Bson.get_boolean (Bson.get_element "autocommit" command));
+  let read_concern =
+    Bson.get_doc_element (Bson.get_element "readConcern" command)
+  in
+  check string "read concern" "snapshot"
+    (Bson.get_string (Bson.get_element "level" read_concern))
 
 let () =
   run "mongo_session"
