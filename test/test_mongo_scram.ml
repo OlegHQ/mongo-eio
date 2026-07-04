@@ -49,8 +49,17 @@ let test_sha256_vector () =
       ~client_first_bare:"n=user,r=rOprNGfwEbeRWgbNEkqO"
       ~server_first:sha256_server_first
   in
-  check string "client proof" "dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=" proof;
-  check string "server signature" "6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=" sig_
+  check string "client proof" "dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ="
+    proof;
+  check string "server signature" "6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4="
+    sig_
+
+let test_nonce_uses_csprng_shape () =
+  let first = Mongo_scram.generate_nonce () in
+  let second = Mongo_scram.generate_nonce () in
+  check int "24 raw bytes as base64" 32 (String.length first);
+  check bool "nonce differs" true (not (String.equal first second));
+  check int "decoded bytes" 24 (String.length (Mongo_scram.Base64.decode first))
 
 let () =
   run "mongo_scram"
@@ -59,5 +68,6 @@ let () =
         [
           test_case "SCRAM-SHA-1" `Quick test_sha1_vector;
           test_case "SCRAM-SHA-256" `Quick test_sha256_vector;
+          test_case "nonce shape" `Quick test_nonce_uses_csprng_shape;
         ] );
     ]

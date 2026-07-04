@@ -10,17 +10,12 @@ let to_hex s =
 let mongo_sha1_password ~username ~password =
   Digest.to_hex (Digest.string (username ^ ":mongo:" ^ password))
 
-let hash_sha256 data =
-  Digestif.SHA256.(to_raw_string (digest_string data))
-
-let hash_sha1 data =
-  Digestif.SHA1.(to_raw_string (digest_string data))
+let hash_sha256 data = Digestif.SHA256.(to_raw_string (digest_string data))
+let hash_sha1 data = Digestif.SHA1.(to_raw_string (digest_string data))
 
 let hmac_sha256 ~key data =
   let block_size = 64 in
-  let normalize k =
-    if String.length k > block_size then hash_sha256 k else k
-  in
+  let normalize k = if String.length k > block_size then hash_sha256 k else k in
   let key = normalize key in
   let key = key ^ String.make (block_size - String.length key) '\x00' in
   let inner =
@@ -65,7 +60,7 @@ let pbkdf2 mechanism ~password ~salt ~iterations ~length =
       let salt_block =
         salt
         ^ String.init 4 (fun i ->
-              Char.chr ((block lsr ((3 - i) * 8)) land 0xFF))
+            Char.chr ((block lsr ((3 - i) * 8)) land 0xFF))
       in
       let u1 = hmac password salt_block in
       let rec iter count previous acc =
@@ -101,7 +96,9 @@ let stored_key mechanism client_key =
 
 module Base64 = struct
   let encode s =
-    let table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" in
+    let table =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    in
     let len = String.length s in
     let rec chunk i acc =
       if i >= len then acc
@@ -116,7 +113,9 @@ module Base64 = struct
           if i + 1 < len then acc ^ emit (((b1 land 0xF) lsl 2) lor (b2 lsr 6))
           else acc ^ "="
         in
-        let acc = if i + 2 < len then acc ^ emit (b2 land 0x3F) else acc ^ "=" in
+        let acc =
+          if i + 2 < len then acc ^ emit (b2 land 0x3F) else acc ^ "="
+        in
         chunk (i + 3) acc
     in
     chunk 0 ""
@@ -192,23 +191,27 @@ let parse_server_first payload =
   let find prefix =
     try
       let part = List.find (String.starts_with ~prefix) parts in
-      Some (String.sub part (String.length prefix) (String.length part - String.length prefix))
+      Some
+        (String.sub part (String.length prefix)
+           (String.length part - String.length prefix))
     with _ -> None
   in
   match (find "r=", find "s=", find "i=") with
-  | Some nonce, Some salt_b64, Some iter_s -> (
+  | Some nonce, Some salt_b64, Some iter_s ->
       let salt = Base64.decode salt_b64 in
-      Ok (nonce, salt, int_of_string iter_s))
+      Ok (nonce, salt, int_of_string iter_s)
   | _ -> Error "invalid server-first message"
 
+let rng_initialized = lazy (Mirage_crypto_rng_unix.use_default ())
+
 let generate_nonce () =
-  Random.self_init ();
-  Bytes.init 24 (fun _ -> Char.chr (Random.bits () land 0xFF)) |> Bytes.to_string
-  |> Base64.encode
+  Lazy.force rng_initialized;
+  Mirage_crypto_rng.generate 24 |> Base64.encode
 
 let client_first_bare username nonce = Printf.sprintf "n=%s,r=%s" username nonce
 
-let client_first_message username nonce = Printf.sprintf "n,,n=%s,r=%s" username nonce
+let client_first_message username nonce =
+  Printf.sprintf "n,,n=%s,r=%s" username nonce
 
 let client_final_message channel_binding nonce proof =
   Printf.sprintf "c=%s,r=%s,p=%s" channel_binding nonce proof
@@ -257,8 +260,8 @@ let payload_string element =
 let options_doc =
   Bson.add_element "skipEmptyExchange" (Bson.create_boolean true) Bson.empty
 
-let authenticate_transport ?timeout_ms mechanism ~password ~username ~auth_source
-    transport =
+let authenticate_transport ?timeout_ms mechanism ~password ~username
+    ~auth_source transport =
   try
     let nonce = generate_nonce () in
     let client_first = client_first_bare username nonce in
@@ -267,12 +270,12 @@ let authenticate_transport ?timeout_ms mechanism ~password ~username ~auth_sourc
       match
         Mongo_command.run_transport ?timeout_ms ~db:auth_source ~request_id
           transport
-        [
-          ("saslStart", Bson.create_int32 1l);
-          ("mechanism", Bson.create_string (mechanism_name mechanism));
-          ("payload", payload_element (client_first_message username nonce));
-          ("options", Bson.create_doc_element options_doc);
-        ]
+          [
+            ("saslStart", Bson.create_int32 1l);
+            ("mechanism", Bson.create_string (mechanism_name mechanism));
+            ("payload", payload_element (client_first_message username nonce));
+            ("options", Bson.create_doc_element options_doc);
+          ]
       with
       | Ok response -> response.body
       | Error err -> Mongo_error.raise_exn err
@@ -284,7 +287,7 @@ let authenticate_transport ?timeout_ms mechanism ~password ~username ~auth_sourc
     let server_first = payload_string (Bson.get_element "payload" sasl_start) in
     match parse_server_first server_first with
     | Error message -> Error (Mongo_error.Authentication message)
-    | Ok (server_nonce, salt, iterations) ->
+    | Ok (server_nonce, salt, iterations) -> (
         if not (String.starts_with ~prefix:nonce server_nonce) then
           Error (Mongo_error.Authentication "server nonce mismatch")
         else if iterations < 4096 then
@@ -317,12 +320,12 @@ let authenticate_transport ?timeout_ms mechanism ~password ~username ~auth_sourc
             match
               Mongo_command.run_transport ?timeout_ms ~db:auth_source
                 ~request_id:request_id2 transport
-              [
-                ("saslContinue", Bson.create_int32 1l);
-                ( "conversationId",
-                  Bson.create_int32 (Int32.of_int conversation_id) );
-                ("payload", payload_element client_final);
-              ]
+                [
+                  ("saslContinue", Bson.create_int32 1l);
+                  ( "conversationId",
+                    Bson.create_int32 (Int32.of_int conversation_id) );
+                  ("payload", payload_element client_final);
+                ]
             with
             | Ok response -> response.body
             | Error err -> Mongo_error.raise_exn err
@@ -335,9 +338,10 @@ let authenticate_transport ?timeout_ms mechanism ~password ~username ~auth_sourc
           | Some sig_
             when String.equal sig_ (server_signature mechanism skey auth_msg) ->
               Ok ()
-          | _ -> Error (Mongo_error.Authentication "server signature mismatch")
+          | _ -> Error (Mongo_error.Authentication "server signature mismatch"))
   with
-  | Mongo_error.Mongo_failed message -> Error (Mongo_error.Authentication message)
+  | Mongo_error.Mongo_failed message ->
+      Error (Mongo_error.Authentication message)
   | exn -> Error (Mongo_error.Authentication (Printexc.to_string exn))
 
 let authenticate ?timeout_ms mechanism ~password ~username ~auth_source fd =
