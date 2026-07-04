@@ -99,18 +99,19 @@ let reserve_new pool =
         let expired = prune_idle_locked pool in
         let reservation =
           if pool.closed then Error (Mongo_error.Network "connection pool is closed")
-          else if pool.idle <> [] then
-            let pooled = List.hd pool.idle in
-            pool.idle <- List.tl pool.idle;
-            Hashtbl.replace pool.checked_out
-              (Mongo_connection.file_descr pooled.connection)
-              pooled.generation;
-            Ok (`Existing pooled.connection)
-          else if not (max_reached pool) then (
-            pool.total <- pool.total + 1;
-            pool.peak_total <- max pool.peak_total pool.total;
-            Ok (`Reserved pool.generation))
-          else Ok `Wait
+          else
+            match pool.idle with
+            | pooled :: idle ->
+                pool.idle <- idle;
+                Hashtbl.replace pool.checked_out
+                  (Mongo_connection.file_descr pooled.connection)
+                  pooled.generation;
+                Ok (`Existing pooled.connection)
+            | [] when not (max_reached pool) ->
+                pool.total <- pool.total + 1;
+                pool.peak_total <- max pool.peak_total pool.total;
+                Ok (`Reserved pool.generation)
+            | [] -> Ok `Wait
         in
         (expired, reservation))
   in
